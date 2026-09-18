@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>comparador ver.0.1</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>body{font-family:Arial,sans-serif;max-width:1100px;margin:30px auto;padding:0 16px;background:#f5f6f8;color:#202124}h1{font-size:25px}.card{background:white;padding:20px;border-radius:12px;margin:14px 0;box-shadow:0 2px 10px #0001}button{padding:10px 15px;border:0;border-radius:8px;background:#2563eb;color:white;cursor:pointer}button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-weight:bold;margin-bottom:6px}input,select{width:100%;padding:10px;box-sizing:border-box}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #ddd;padding:7px;text-align:left}th{background:#eef2ff}.ok{color:#15803d}.bad{color:#b91c1c}.muted{color:#666}.scroll{overflow:auto;max-height:500px}@media(max-width:700px){.grid{grid-template-columns:1fr}}</style></head>
+<body>
+<h1>comparador ver.0.1</h1>
+<p class="muted">importe dois arquivos. o sistema normaliza espaços, maiúsculos/minúsculos e acentos para comparar os registros como uma unica informação.</p>
+<div class="card grid"><div><label>arquivo 1</label><input id="file1" type="file" accept=".xlsx,.xls,.csv"></div><div><label>arquivo 2</label><input id="file2" type="file" accept=".xlsx,.xls,.csv"></div></div>
+<div class="card"><label>colunas usadas para identificar o registro</label><p class="muted">selecione as colunas que formam a identidade do item, por exemplo: lote+tratamento. se deixar vazio todas as colunas comuns serão usadas.</p><select id="keys" multiple size="6"></select><br><br><button id="compare">comparar</button> <button id="export" disabled>exportar divergências CSV</button><div id="summary"></div></div>
+<div class="card"><h3>resultado</h3><div id="result" class="scroll"><p class="muted">aguardando arquivos.</p></div></div>
+<script>
+let sheets=[null,null], last=[];
+const $=id=>document.getElementById(id);
+function norm(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toUpperCase();}
+function parseFile(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];resolve(XLSX.utils.sheet_to_json(ws,{defval:'',raw:false}));}catch(err){reject(err)}};r.onerror=reject;r.readAsArrayBuffer(file)})}
+function headers(rows){return [...new Set(rows.flatMap(r=>Object.keys(r)))];}
+function keyName(h){return norm(h).replace(/[^A-Z0-9]/g,'');}
+function findHeader(list, target){return list.find(h=>keyName(h)===target)||list.find(h=>keyName(h).includes(target));}
+function signature(row, cols){return cols.map(c=>norm(row[c])).join(' || ');}
+function rowData(row, cols){return cols.map(c=>`${c}: ${row[c]??''}`).join(' | ')}
+async function load(i){const f=$('file'+(i+1)).files[0];if(!f)return;try{sheets[i]=await parseFile(f);if(sheets[0]&&sheets[1])setupKeys();}catch(e){alert('Erro ao ler arquivo: '+e.message)}}
+$('file1').onchange=()=>load(0);$('file2').onchange=()=>load(1);
+function setupKeys(){const hs1=headers(sheets[0]),hs2=headers(sheets[1]);const common=hs1.filter(a=>hs2.some(b=>keyName(a)===keyName(b)));$('keys').innerHTML='';common.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;$('keys').appendChild(o)});['LOTE','TRATAMENTO'].forEach(t=>{const h=findHeader(common,t);if(h)[...$('keys').options].find(o=>o.value===h).selected=true;});}
+$('compare').onclick=()=>{if(!sheets[0]||!sheets[1])return alert('selecione os dois arquivos.');const hs1=headers(sheets[0]),hs2=headers(sheets[1]);const common=hs1.filter(a=>hs2.some(b=>keyName(a)===keyName(b)));let cols=[...$('keys').selectedOptions].map(o=>o.value);if(!cols.length)cols=common;if(!cols.length)return alert('não há colunas em comum.');
+const map1=new Map(),map2=new Map();sheets[0].forEach((r,i)=>{const k=signature(r,cols);if(!map1.has(k))map1.set(k,[]);map1.get(k).push({r,i:i+2})});sheets[1].forEach((r,i)=>{const k=signature(r,cols);if(!map2.has(k))map2.set(k,[]);map2.get(k).push({r,i:i+2})});
+last=[];let html='<table><tr><th>Status</th><th>Registro</th><th>Planilha 1</th><th>arquivo 2</th></tr>';
+for(const [k,arr] of map1){const n1=arr.length,n2=(map2.get(k)||[]).length; if(n1!==n2){last.push(['QUANTIDADE DIFERENTE',k,n1,n2]);html+=`<tr><td class="bad">quantidade diferente</td><td>${esc(k)}</td><td>${n1}</td><td>${n2}</td></tr>`}}
+for(const [k,arr] of map1){if(!map2.has(k)){last.push(['SOMENTE NA PLANILHA 1',k,arr.length,0]);html+=`<tr><td class="bad">so no arquivo 1</td><td>${esc(k)}</td><td>${arr.length}</td><td>0</td></tr>`}}
+for(const [k,arr] of map2){if(!map1.has(k)){last.push(['SOMENTE NA PLANILHA 2',k,0,arr.length]);html+=`<tr><td class="bad">so no arquivo 2</td><td>${esc(k)}</td><td>0</td><td>${arr.length}</td></tr>`}}
+if(!last.length)html+='<tr><td colspan="4" class="ok">as informações selecionadas batem nos dois arquivos.</td></tr>';html+='</table>';$('result').innerHTML=html;$('summary').innerHTML=`<p><b>colunas comparadas:</b> ${cols.join(', ')}<br><b>divergências:</b> ${last.length}</p>`;$('export').disabled=!last.length;};
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+$('export').onclick=()=>{const csv=[['Status','Registro','Planilha 1','Planilha 2'],...last].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='divergencias.csv';a.click();};
+</script></body></html>

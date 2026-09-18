@@ -4,7 +4,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>body{font-family:Arial,sans-serif;max-width:1100px;margin:30px auto;padding:0 16px;background:#f5f6f8;color:#202124}h1{font-size:25px}.card{background:white;padding:20px;border-radius:12px;margin:14px 0;box-shadow:0 2px 10px #0001}button{padding:10px 15px;border:0;border-radius:8px;background:#2563eb;color:white;cursor:pointer}button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-weight:bold;margin-bottom:6px}input,select{width:100%;padding:10px;box-sizing:border-box}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #ddd;padding:7px;text-align:left}th{background:#eef2ff}.ok{color:#15803d}.bad{color:#b91c1c}.muted{color:#666}.scroll{overflow:auto;max-height:500px}@media(max-width:700px){.grid{grid-template-columns:1fr}}</style></head>
 <body>
-<h1>comparador ver.0.1</h1>
+<h1>comparador</h1>
 <p class="muted">importe dois arquivos. o sistema normaliza espaços, maiúsculos/minúsculos e acentos para comparar os registros como uma unica informação.</p>
 <div class="card grid"><div><label>arquivo 1</label><input id="file1" type="file" accept=".xlsx,.xls,.csv"></div><div><label>arquivo 2</label><input id="file2" type="file" accept=".xlsx,.xls,.csv"></div></div>
 <div class="card"><label>colunas usadas para identificar o registro</label><p class="muted">selecione as colunas que formam a identidade do item, por exemplo: lote+tratamento. se deixar vazio todas as colunas comuns serão usadas.</p><select id="keys" multiple size="6"></select><br><br><button id="compare">comparar</button> <button id="export" disabled>exportar divergências CSV</button><div id="summary"></div></div>
